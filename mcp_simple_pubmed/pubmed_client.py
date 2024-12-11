@@ -6,8 +6,9 @@ import time
 import logging
 import http.client
 import xml.etree.ElementTree as ET
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Tuple
 from Bio import Entrez
+from metapub import PubMedFetcher
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +34,17 @@ class PubMedClient:
         Entrez.tool = tool
         if api_key:
             Entrez.api_key = api_key
+            
+        # Initialize metapub fetcher
+        self.fetcher = PubMedFetcher()
+
+    def _clean_text(self, text: Optional[str]) -> Optional[str]:
+        """Clean and format text content."""
+        if text is None:
+            return None
+        # Replace multiple spaces and newlines with single space
+        cleaned = ' '.join(text.split())
+        return cleaned
 
     async def search_articles(self, query: str, max_results: int = 10) -> List[Dict[str, Any]]:
         """Search for articles matching the query.
@@ -72,53 +84,28 @@ class PubMedClient:
                 
                 # Step 2: Get details for each article
                 for pmid in pmids:
-                    logger.info(f"Fetching details for PMID {pmid}")
-                    detail_handle = Entrez.efetch(db="pubmed", id=pmid, rettype="xml")
-                    
-                    if detail_handle and isinstance(detail_handle, http.client.HTTPResponse):
-                        article_xml = detail_handle.read()
-                        detail_handle.close()
-                        
-                        # Parse article details
-                        article_root = ET.fromstring(article_xml)
-                        
-                        # Get basic article data
-                        article = {
+                    try:
+                        article = self.fetcher.article_by_pmid(pmid)
+                        results.append({
                             "pmid": pmid,
-                            "title": self._get_xml_text(article_root, './/ArticleTitle') or "No title",
-                            "abstract": self._get_xml_text(article_root, './/Abstract/AbstractText') or "No abstract available",
-                            "journal": self._get_xml_text(article_root, './/Journal/Title') or "",
-                            "authors": []
-                        }
-                        
-                        # Get authors
-                        author_list = article_root.findall('.//Author')
-                        for author in author_list:
-                            last_name = self._get_xml_text(author, 'LastName') or ""
-                            fore_name = self._get_xml_text(author, 'ForeName') or ""
-                            if last_name or fore_name:
-                                article["authors"].append(f"{last_name} {fore_name}".strip())
-                        
-                        # Get publication date
-                        pub_date = article_root.find('.//PubDate')
-                        if pub_date is not None:
-                            year = self._get_xml_text(pub_date, 'Year')
-                            month = self._get_xml_text(pub_date, 'Month')
-                            day = self._get_xml_text(pub_date, 'Day')
-                            article["publication_date"] = {
-                                "year": year,
-                                "month": month,
-                                "day": day
-                            }
-                            
-                        # Get DOI if available
-                        article_id_list = article_root.findall('.//ArticleId')
-                        for article_id in article_id_list:
-                            if article_id.get('IdType') == 'doi':
-                                article["doi"] = article_id.text
-                                break
-                                
-                        results.append(article)
+                            "title": article.title,
+                            "abstract": article.abstract,
+                            "journal": article.journal,
+                            "authors": [str(author) for author in article.authors],
+                            "publication_date": {
+                                "year": article.year,
+                                "month": article.month,
+                                "day": article.day
+                            },
+                            "doi": article.doi,
+                            "pmc_id": article.pmc,
+                            "urls": self._generate_urls(pmid, article.doi, article.pmc),
+                            "abstract_uri": f"pubmed://{pmid}/abstract",
+                            "full_text_uri": f"pubmed://{pmid}/full_text"
+                        })
+                    except Exception as e:
+                        logger.error(f"Error processing article {pmid}: {str(e)}")
+                        continue
             
             return results
 
@@ -126,9 +113,81 @@ class PubMedClient:
             logger.exception(f"Error in search_articles: {str(e)}")
             raise
             
+    async def get_full_text(self, pmid: str) -> Tuple[Dict[str, Any], Dict[str, str]]:
+        """Get full text and metadata of an article using metapub.
+        
+        Args:
+            pmid: PubMed ID of the article
+            
+        Returns:
+            Tuple of (article info dict, URLs dict)
+        """
+        try:
+            logger.info(f"Fetching article {pmid} using metapub")
+            article = self.fetcher.article_by_pmid(pmid)
+            urls = self._generate_urls(pmid, article.doi, article.pmc)
+            
+            result = {
+                "pmid": pmid,
+                "title": article.title,
+                "journal": article.journal,
+                "authors": [str(author) for author in article.authors],
+                "year": article.year,
+                "doi": article.doi,
+                "pmc_id": article.pmc,
+                "abstract": article.abstract
+            }
+            
+            try:
+                content = article.content
+                if content:
+                    result["full_text"] = self._clean_text(content)
+                    result["content_source"] = "Full text available"
+                else:
+                    result["content_source"] = "Full text not directly available"
+            except Exception as e:
+                logger.warning(f"Could not get full text content: {str(e)}")
+                result["content_source"] = f"Error getting full text: {str(e)}"
+            
+            # Add citation info if available
+            if hasattr(article, 'citation'):
+                result["citation"] = article.citation
+                
+            return result, urls
+            
+        except Exception as e:
+            logger.exception(f"Error fetching article {pmid}: {str(e)}")
+            return {
+                "error": f"Error fetching article: {str(e)}",
+                "pmid": pmid
+            }, self._generate_urls(pmid)
+            
     def _get_xml_text(self, elem: Optional[ET.Element], xpath: str) -> Optional[str]:
         """Helper method to safely get text from XML element."""
         if elem is None:
             return None
         found = elem.find(xpath)
         return found.text if found is not None else None
+        
+    def _generate_urls(self, pmid: str, doi: Optional[str] = None, pmc_id: Optional[str] = None) -> Dict[str, str]:
+        """Generate URLs for human access.
+        
+        Args:
+            pmid: PubMed ID
+            doi: Optional DOI
+            pmc_id: Optional PMC ID
+            
+        Returns:
+            Dictionary with URLs
+        """
+        urls = {
+            "pubmed": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+            "pubmed_mobile": f"https://m.pubmed.ncbi.nlm.nih.gov/{pmid}/"
+        }
+        
+        if doi:
+            urls["doi"] = f"https://doi.org/{doi}"
+        if pmc_id:
+            urls["pmc"] = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmc_id}/"
+            
+        return urls
