@@ -89,26 +89,18 @@ Note: Use quotes around multi-word terms for best results.""",
         ),
         types.Tool(
             name="get_paper_fulltext",
-            description="""Get full text and detailed information about a PubMed article using its ID.
+            description="""Get full text of a PubMed article using its ID.
 
-This tool will attempt to:
-1. Fetch the full text content (if available via PubMed Central)
-2. Provide article metadata:
-   - Title and abstract
-   - Authors
-   - Journal information
-   - Publication date
-   - Citation information
-3. Generate access URLs:
-   - PubMed web and mobile links
-   - DOI link (if available)
-   - PubMed Central link (if available)
-
-If full text isn't directly available, the tool will provide information about 
-where the paper can be accessed.
+This tool attempts to retrieve the complete text of the paper if available through PubMed Central.
+If the paper is not available in PMC, it will return a message explaining why and provide information
+about where the text might be available (e.g., through DOI).
 
 Example usage:
-get_paper_fulltext(pmid="39661433")""",
+get_paper_fulltext(pmid="39661433")
+
+Returns:
+- If successful: The complete text of the paper
+- If not available: A clear message explaining why (e.g., "not in PMC", "requires journal access")""",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -156,18 +148,13 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[types.TextCont
             if "pmid" not in arguments:
                 raise ValueError("Missing required argument: pmid")
                 
-            # Get full text and metadata
-            paper_info, urls = await pubmed_fetch.get_full_text(arguments["pmid"])
-            
-            # Combine results
-            result = {
-                "paper_info": paper_info,
-                "urls": urls
-            }
+            # Get just the full text
+            full_text = await pubmed_fetch.get_full_text(arguments["pmid"])
             
             return [types.TextContent(
                 type="text",
-                text=json.dumps(result, indent=2)
+                text=full_text,
+                isError=full_text.startswith("Error") or full_text.startswith("Full text not available")
             )]
         
         else:

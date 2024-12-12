@@ -1,212 +1,102 @@
 """
 Full text fetching functionality for PubMed articles.
 
-This module uses Bio.Entrez for metadata and trafilatura for full text extraction
-from publicly available URLs.
+This module focuses solely on retrieving full text content from PMC
+using Bio.Entrez. It does not handle metadata retrieval which is
+done by pubmed_search.py.
 """
 import logging
-import asyncio
-from typing import Dict, Any, Tuple, Optional
-import httpx
-import trafilatura
+from typing import Optional
+import xml.etree.ElementTree as ET
 from Bio import Entrez, Medline
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("pubmed-fetch")
 
 class PubMedFetch:
-    """Client for fetching full text and detailed article information from PubMed."""
+    """Client for fetching full text from PubMed Central."""
 
-    def __init__(self):
-        """Initialize PubMed fetcher."""
-        # Configure httpx client for URL fetching
-        self.http_client = httpx.AsyncClient(
-            timeout=30.0,
-            follow_redirects=True
-        )
-
-    async def _fetch_full_text_from_url(self, url: str) -> Optional[str]:
-        """Attempt to fetch and extract full text from a URL.
+    def _extract_text_from_pmc_xml(self, xml_content: str) -> str:
+        """Extract readable text content from PMC XML.
         
         Args:
-            url: URL to fetch content from
+            xml_content: PMC article XML
             
         Returns:
-            Extracted text if successful, None otherwise
+            Extracted text content
         """
         try:
-            response = await self.http_client.get(url)
-            response.raise_for_status()
+            root = ET.fromstring(xml_content)
             
-            # Try to extract text using trafilatura
-            downloaded = response.text
-            text = trafilatura.extract(downloaded)
+            # Get article title
+            title = root.find(".//article-title")
+            text_parts = []
+            if title is not None:
+                text_parts.append(title.text)
             
-            if text:
-                logger.info(f"Successfully extracted text from {url}")
-                return text
-            else:
-                logger.warning(f"No text could be extracted from {url}")
-                return None
-                
+            # Get abstract
+            abstract = root.find(".//abstract")
+            if abstract is not None:
+                for p in abstract.findall(".//p"):
+                    if p.text:
+                        text_parts.append(p.text)
+            
+            # Get main body text
+            body = root.find(".//body")
+            if body is not None:
+                for p in body.findall(".//p"):
+                    if p.text:
+                        text_parts.append(p.text)
+                        
+            return "\n\n".join(text_parts)
+            
+        except ET.ParseError as e:
+            logger.error(f"Error parsing PMC XML: {str(e)}")
+            raise ValueError(f"Could not parse PMC XML content: {str(e)}")
         except Exception as e:
-            logger.warning(f"Error fetching {url}: {str(e)}")
-            return None
+            logger.error(f"Error extracting text from PMC XML: {str(e)}")
+            raise ValueError(f"Error processing PMC content: {str(e)}")
 
-    async def _try_get_full_text(self, urls: Dict[str, str]) -> Tuple[Optional[str], str]:
-        """Try to get full text from various URLs.
-        
-        Args:
-            urls: Dictionary of URLs to try
-            
-        Returns:
-            Tuple of (extracted text or None, source description)
-        """
-        # Try PMC first if available
-        if "pmc" in urls:
-            text = await self._fetch_full_text_from_url(urls["pmc"])
-            if text:
-                return text, f"Full text extracted from PMC: {urls['pmc']}"
-                
-        # Try DOI link
-        if "doi" in urls:
-            text = await self._fetch_full_text_from_url(urls["doi"])
-            if text:
-                return text, f"Full text extracted from DOI: {urls['doi']}"
-
-        # No full text found - return access information
-        source_info = []
-        if "pmc" in urls:
-            source_info.append(f"PubMed Central: {urls['pmc']}")
-        if "doi" in urls:
-            source_info.append(f"DOI: {urls['doi']}")
-        if source_info:
-            return None, "Full text may be available at: " + "; ".join(source_info)
-        else:
-            return None, "Full text access links not available"
-
-    def _clean_text(self, text: Optional[str]) -> Optional[str]:
-        """Clean and format text content.
-        
-        Args:
-            text: Text to clean
-            
-        Returns:
-            Cleaned text with normalized whitespace
-        """
-        if text is None:
-            return None
-        # Replace multiple spaces and newlines with single space
-        cleaned = ' '.join(text.split())
-        return cleaned
-
-    async def get_full_text(self, pmid: str) -> Tuple[Dict[str, Any], Dict[str, str]]:
-        """Get full text and detailed metadata of an article.
+    async def get_full_text(self, pmid: str) -> str:
+        """Get full text of an article if available.
         
         Args:
             pmid: PubMed ID of the article
             
         Returns:
-            Tuple of (article info dict, URLs dict)
-            Article info includes:
-            - Basic metadata (title, authors, journal, etc.)
-            - Abstract
-            - Full text (if available)
-            - Citation information
-            - Content source information
-            URLs include links to:
-            - PubMed
-            - PubMed Mobile
-            - DOI (if available)
-            - PubMed Central (if available)
+            Full text content if available, otherwise an error message
+            explaining why the text is not available.
+            
+        Raises:
+            ValueError: If there are issues accessing or parsing the content
         """
         try:
-            logger.info(f"Fetching article {pmid}")
-            
-            # Get article metadata using Bio.Entrez
+            # First get PMC ID if available
             handle = Entrez.efetch(db="pubmed", id=pmid, rettype="medline", retmode="text")
             record = Medline.read(handle)
             handle.close()
             
-            # Generate access URLs
-            urls = {
-                "pubmed": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
-                "pubmed_mobile": f"https://m.pubmed.ncbi.nlm.nih.gov/{pmid}/"
-            }
-            
-            # Add DOI URL if available
-            if 'DOI' in record:
-                urls["doi"] = f"https://doi.org/{record['DOI']}"
-                
-            # Add PMC URL if available
             if 'PMC' in record:
-                urls["pmc"] = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{record['PMC']}/"
+                logger.info(f"Found PMC ID for article {pmid}, attempting to fetch full text")
+                pmc_id = record['PMC']
                 
-            # Try to get full text
-            full_text, content_source = await self._try_get_full_text(urls)
-            
-            # Build result dictionary
-            result = {
-                "pmid": pmid,
-                "title": self._clean_text(record.get('TI')),
-                "abstract": self._clean_text(record.get('AB')),
-                "authors": record.get('AU', []),
-                "journal": {
-                    "name": record.get('JT'),
-                    "volume": record.get('VI'),
-                    "issue": record.get('IP'),
-                    "pages": record.get('PG')
-                },
-                "publication_date": {
-                    "year": record.get('DP', '').split()[0] if record.get('DP') else None,
-                    "month": record.get('DP', '').split()[1] if record.get('DP', '').count(' ') >= 1 else None,
-                    "day": record.get('DP', '').split()[2] if record.get('DP', '').count(' ') >= 2 else None
-                },
-                "identifiers": {
-                    "pmid": pmid,
-                    "doi": record.get('DOI'),
-                    "pmc": record.get('PMC')
-                },
-                "content_source": content_source
-            }
-            
-            # Add full text if available
-            if full_text:
-                result["full_text"] = full_text
+                # Get full text from PMC
+                pmc_handle = Entrez.efetch(db='pmc', id=pmc_id, rettype='full', retmode='xml')
+                full_text = pmc_handle.read()
+                pmc_handle.close()
                 
-            # Add citation if available
-            if 'SO' in record:
-                result["citation"] = record['SO']
-            
-            return result, urls
-            
+                # Parse XML and extract text
+                text = self._extract_text_from_pmc_xml(full_text)
+                if text:
+                    return text
+                else:
+                    return "Error: No text content found in PMC XML"
+                    
+            elif 'DOI' in record:
+                return f"Full text not available in PMC. Article has DOI {record['DOI']} - full text may be available through publisher"
+            else:
+                return "Full text not available - article is not in PMC and has no DOI"
+                
         except Exception as e:
-            logger.exception(f"Error fetching article {pmid}")
-            return {
-                "error": str(e), 
-                "pmid": pmid
-            }, self._generate_urls(pmid)
-
-    def _generate_urls(self, pmid: str, doi: Optional[str] = None, 
-                      pmc_id: Optional[str] = None) -> Dict[str, str]:
-        """Generate URLs for human access.
-        
-        Args:
-            pmid: PubMed ID
-            doi: Optional DOI
-            pmc_id: Optional PMC ID
-            
-        Returns:
-            Dictionary with URLs for various access methods
-        """
-        urls = {
-            "pubmed": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
-            "pubmed_mobile": f"https://m.pubmed.ncbi.nlm.nih.gov/{pmid}/"
-        }
-        
-        if doi:
-            urls["doi"] = f"https://doi.org/{doi}"
-        if pmc_id:
-            urls["pmc"] = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmc_id}/"
-            
-        return urls
+            logger.exception(f"Error getting full text for article {pmid}")
+            return f"Error retrieving full text: {str(e)}"
