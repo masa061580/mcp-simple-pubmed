@@ -12,6 +12,7 @@ from mcp.server import Server
 import mcp.types as types
 from mcp.server.stdio import stdio_server
 from .pubmed_search import PubMedSearch
+from .pubmed_fetch import PubMedFetch
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -22,19 +23,16 @@ app = Server("pubmed-server")
 # Set up error handler
 app.onerror = lambda error: logger.error(f"Server error: {error}")
 
-def configure_pubmed_client() -> PubMedSearch:
-    """Configure PubMed client with environment settings."""
-    email = os.environ.get("PUBMED_EMAIL")
-    if not email:
-        raise ValueError("PUBMED_EMAIL environment variable is required")
-        
-    tool = os.environ.get("PUBMED_TOOL", "mcp-simple-pubmed")
-    api_key = os.environ.get("PUBMED_API_KEY")
+# Initialize the clients
+email = os.environ.get("PUBMED_EMAIL")
+if not email:
+    raise ValueError("PUBMED_EMAIL environment variable is required")
+    
+tool = os.environ.get("PUBMED_TOOL", "mcp-simple-pubmed")
+api_key = os.environ.get("PUBMED_API_KEY")
 
-    return PubMedSearch(email=email, tool=tool, api_key=api_key)
-
-# Initialize the client
-pubmed_client = configure_pubmed_client()
+pubmed_search = PubMedSearch(email=email, tool=tool, api_key=api_key)
+pubmed_fetch = PubMedFetch()
 
 @app.list_tools()
 async def list_tools() -> list[types.Tool]:
@@ -88,6 +86,39 @@ Note: Use quotes around multi-word terms for best results.""",
                 },
                 "required": ["query"]
             }
+        ),
+        types.Tool(
+            name="get_paper_fulltext",
+            description="""Get full text and detailed information about a PubMed article using its ID.
+
+This tool will attempt to:
+1. Fetch the full text content (if available via PubMed Central)
+2. Provide article metadata:
+   - Title and abstract
+   - Authors
+   - Journal information
+   - Publication date
+   - Citation information
+3. Generate access URLs:
+   - PubMed web and mobile links
+   - DOI link (if available)
+   - PubMed Central link (if available)
+
+If full text isn't directly available, the tool will provide information about 
+where the paper can be accessed.
+
+Example usage:
+get_paper_fulltext(pmid="39661433")""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pmid": {
+                        "type": "string",
+                        "description": "PubMed ID of the article"
+                    }
+                },
+                "required": ["pmid"]
+            }
         )
     ]
 
@@ -111,7 +142,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[types.TextCont
             max_results = min(int(arguments.get("max_results", 10)), 50)
 
             # Perform the search
-            results = await pubmed_client.search_articles(
+            results = await pubmed_search.search_articles(
                 query=query,
                 max_results=max_results
             )
@@ -121,6 +152,24 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[types.TextCont
                 text=json.dumps(results, indent=2)
             )]
             
+        elif name == "get_paper_fulltext":
+            if "pmid" not in arguments:
+                raise ValueError("Missing required argument: pmid")
+                
+            # Get full text and metadata
+            paper_info, urls = await pubmed_fetch.get_full_text(arguments["pmid"])
+            
+            # Combine results
+            result = {
+                "paper_info": paper_info,
+                "urls": urls
+            }
+            
+            return [types.TextContent(
+                type="text",
+                text=json.dumps(result, indent=2)
+            )]
+        
         else:
             raise ValueError(f"Unknown tool: {name}")
         

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-simple-pubmed"
-version = "0.1.3"
+version = "0.1.5"
 description = "An MCP server that provides access to PubMed articles through Entrez API."
 readme = "README.md"
 authors = [
@@ -19,9 +19,9 @@ classifiers = [
 ]
 dependencies = [
     "mcp",
-    "biopython",  # for PubMed/Entrez API access
-    "metapub",    # for full-text paper access
-    "httpx",      # for making HTTP requests with async support
+    "biopython",      # for PubMed/Entrez API access
+    "trafilatura",    # for extracting text from web pages
+    "httpx",          # for making HTTP requests with async support
 ]
 
 [project.urls]
