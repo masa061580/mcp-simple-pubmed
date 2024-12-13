@@ -2,8 +2,7 @@
 Full text fetching functionality for PubMed articles.
 
 This module focuses solely on retrieving full text content from PMC
-using Bio.Entrez. It does not handle metadata retrieval which is
-done by pubmed_search.py.
+using Bio.Entrez.
 """
 import logging
 from typing import Optional
@@ -15,8 +14,22 @@ logger = logging.getLogger("pubmed-fetch")
 
 class PubMedFetch:
     """Client for fetching full text from PubMed Central."""
+    
+    def _clean_text(self, text: Optional[str]) -> Optional[str]:
+        """Clean text content.
+        
+        Args:
+            text: Text to clean
+            
+        Returns:
+            Cleaned text with normalized whitespace
+        """
+        if text is None:
+            return None
+            
+        return ' '.join(text.split())
 
-    def _extract_text_from_pmc_xml(self, xml_content: str) -> str:
+    def _extract_text_from_pmc_xml(self, xml_content: bytes) -> str:
         """Extract readable text content from PMC XML.
         
         Args:
@@ -28,26 +41,50 @@ class PubMedFetch:
         try:
             root = ET.fromstring(xml_content)
             
+            # Dictionary for text parts
+            parts = {}
+            
             # Get article title
-            title = root.find(".//article-title")
-            text_parts = []
-            if title is not None:
-                text_parts.append(title.text)
+            title_elem = root.find(".//article-title")
+            if title_elem is not None and title_elem.text:
+                parts['title'] = self._clean_text(title_elem.text)
             
             # Get abstract
-            abstract = root.find(".//abstract")
-            if abstract is not None:
-                for p in abstract.findall(".//p"):
-                    if p.text:
-                        text_parts.append(p.text)
+            abstract_parts = []
+            for abstract in root.findall(".//abstract//p"):
+                if abstract.text:
+                    abstract_parts.append(self._clean_text(abstract.text))
+            if abstract_parts:
+                parts['abstract'] = " ".join(abstract_parts)
             
             # Get main body text
-            body = root.find(".//body")
-            if body is not None:
-                for p in body.findall(".//p"):
+            body_parts = []
+            for section in root.findall(".//body//sec"):
+                # Get section title if available
+                title = section.find("title")
+                if title is not None and title.text:
+                    body_parts.append(f"\n\n{title.text}\n")
+                
+                # Get paragraphs in section
+                for p in section.findall(".//p"):
                     if p.text:
-                        text_parts.append(p.text)
-                        
+                        body_parts.append(self._clean_text(p.text))
+            
+            if body_parts:
+                parts['body'] = "\n\n".join(body_parts)
+            
+            # Combine all parts
+            text_parts = []
+            if 'title' in parts:
+                text_parts.append(parts['title'])
+            if 'abstract' in parts:
+                text_parts.append("\nABSTRACT\n" + parts['abstract'])
+            if 'body' in parts:
+                text_parts.append("\nMAIN TEXT\n" + parts['body'])
+                
+            if not text_parts:
+                raise ValueError("No text content found in PMC XML")
+                
             return "\n\n".join(text_parts)
             
         except ET.ParseError as e:
@@ -72,25 +109,22 @@ class PubMedFetch:
         """
         try:
             # First get PMC ID if available
+            logger.info(f"Fetching article {pmid}")
             handle = Entrez.efetch(db="pubmed", id=pmid, rettype="medline", retmode="text")
             record = Medline.read(handle)
             handle.close()
             
             if 'PMC' in record:
-                logger.info(f"Found PMC ID for article {pmid}, attempting to fetch full text")
                 pmc_id = record['PMC']
+                logger.info(f"Found PMC ID {pmc_id}, fetching full text")
                 
                 # Get full text from PMC
                 pmc_handle = Entrez.efetch(db='pmc', id=pmc_id, rettype='full', retmode='xml')
-                full_text = pmc_handle.read()
+                xml_content = pmc_handle.read()
                 pmc_handle.close()
                 
                 # Parse XML and extract text
-                text = self._extract_text_from_pmc_xml(full_text)
-                if text:
-                    return text
-                else:
-                    return "Error: No text content found in PMC XML"
+                return self._extract_text_from_pmc_xml(xml_content)
                     
             elif 'DOI' in record:
                 return f"Full text not available in PMC. Article has DOI {record['DOI']} - full text may be available through publisher"
