@@ -11,6 +11,7 @@ from mcp.server import Server
 import mcp.types as types
 from mcp.server.stdio import stdio_server
 from .pubmed_client import PubMedClient
+from .fulltext_client import FullTextClient
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -30,10 +31,13 @@ def configure_pubmed_client() -> PubMedClient:
     tool = os.environ.get("PUBMED_TOOL", "mcp-simple-pubmed")
     api_key = os.environ.get("PUBMED_API_KEY")
 
-    return PubMedClient(email=email, tool=tool, api_key=api_key)
+    pubmed_client = PubMedClient(email=email, tool=tool, api_key=api_key)
+    fulltext_client = FullTextClient(email=email, tool=tool, api_key=api_key)
+    
+    return pubmed_client, fulltext_client
 
-# Initialize the client
-pubmed_client = configure_pubmed_client()
+# Initialize the clients
+pubmed_client, fulltext_client = configure_pubmed_client()
 
 @app.list_tools()
 async def list_tools() -> list[types.Tool]:
@@ -87,25 +91,42 @@ Note: Use quotes around multi-word terms for best results.""",
                 },
                 "required": ["query"]
             }
-        )
+        ),
+        types.Tool(
+            name="get_paper_fulltext",
+            description="""Get full text of a PubMed article using its ID.
+
+        This tool attempts to retrieve the complete text of the paper if available through PubMed Central.
+        If the paper is not available in PMC, it will return a message explaining why and provide information
+        about where the text might be available (e.g., through DOI).
+
+        Example usage:
+        get_paper_fulltext(pmid="39661433")
+
+        Returns:
+        - If successful: The complete text of the paper
+        - If not available: A clear message explaining why (e.g., "not in PMC", "requires journal access")""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pmid": {
+                        "type": "string",
+                        "description": "PubMed ID of the article"
+                    }
+                },
+                "required": ["pmid"]
+            }
+        )        
     ]
 
 @app.call_tool()
 async def call_tool(name: str, arguments: Dict[str, Any]) -> list[types.TextContent]:
     """Handle tool calls for PubMed operations."""
-    if name != "search_pubmed":
-        logger.error(f"Unknown tool: {name}")
-        return [types.TextContent(
-            type="text",
-            text=f"Unknown tool: {name}",
-            isError=True
-        )]
-
     try:
         # Log the received arguments for debugging
-        logger.info(f"Received arguments: {json.dumps(arguments)}")
+        logger.info(f"Received tool call: {name} with arguments: {json.dumps(arguments)}")
         
-        # Validate required arguments
+        # Validate arguments
         if not isinstance(arguments, dict):
             logger.error(f"Arguments must be a dictionary, got {type(arguments)}")
             return [types.TextContent(
@@ -113,50 +134,97 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[types.TextCont
                 text="Invalid arguments: must be a dictionary",
                 isError=True
             )]
+
+        if name == "search_pubmed":
+            # Validate search arguments
+            if "query" not in arguments:
+                logger.error("Missing required argument: query")
+                return [types.TextContent(
+                    type="text",
+                    text="Missing required argument: query",
+                    isError=True
+                )]
+
+            # Extract search arguments
+            query = arguments["query"]
+            max_results = min(int(arguments.get("max_results", 10)), 50)
+
+            # Log the processed arguments
+            logger.info(f"Processing search with query: {query}, max_results: {max_results}")
+
+            # Perform the search
+            results = await pubmed_client.search_articles(
+                query=query,
+                max_results=max_results
+            )
             
-        if "query" not in arguments:
-            logger.error("Missing required argument: query")
+            # Create resource URIs for articles
+            articles_with_resources = []
+            for article in results:
+                pmid = article["pmid"]
+                article["abstract_uri"] = f"pubmed://{pmid}/abstract"
+                article["full_text_uri"] = f"pubmed://{pmid}/full_text"
+                articles_with_resources.append(article)
+
+            # Format the response
+            formatted_results = json.dumps(articles_with_resources, indent=2)
+            logger.info(f"Search completed successfully, found {len(results)} results")
+
             return [types.TextContent(
                 type="text",
-                text="Missing required argument: query",
+                text=formatted_results
+            )]
+            
+        elif name == "get_paper_fulltext":
+            # Validate fulltext arguments
+            pmid = arguments.get("pmid")
+            if not pmid:
+                logger.error("Missing required argument: pmid")
+                return [types.TextContent(
+                    type="text",
+                    text="Missing required argument: pmid",
+                    isError=True
+                )]
+
+            # First check availability
+            availability = await fulltext_client.check_full_text_availability(pmid)
+            
+            if availability["status"] == "available":
+                full_text = await fulltext_client.get_full_text(pmid)
+                if full_text:
+                    logger.info(f"Successfully retrieved full text for PMID {pmid}")
+                    return [types.TextContent(
+                        type="text",
+                        text=full_text
+                    )]
+                else:
+                    logger.error(f"Failed to retrieve full text for PMID {pmid}")
+                    return [types.TextContent(
+                        type="text",
+                        text="Error retrieving full text even though it was marked as available.",
+                        isError=True
+                    )]
+            else:
+                logger.info(f"Full text not available for PMID {pmid}: {availability['message']}")
+                return [types.TextContent(
+                    type="text",
+                    text=availability["message"],
+                    isError=True
+                )]
+        
+        else:
+            logger.error(f"Unknown tool: {name}")
+            return [types.TextContent(
+                type="text",
+                text=f"Unknown tool: {name}",
                 isError=True
             )]
-
-        # Extract arguments
-        query = arguments["query"]
-        max_results = min(int(arguments.get("max_results", 10)), 50)
-
-        # Log the processed arguments
-        logger.info(f"Processing search with query: {query}, max_results: {max_results}")
-
-        # Perform the search
-        results = await pubmed_client.search_articles(
-            query=query,
-            max_results=max_results
-        )
-        
-        # Create resource URIs for articles
-        articles_with_resources = []
-        for article in results:
-            pmid = article["pmid"]
-            article["abstract_uri"] = f"pubmed://{pmid}/abstract"
-            article["full_text_uri"] = f"pubmed://{pmid}/full_text"
-            articles_with_resources.append(article)
-
-        # Format the response
-        formatted_results = json.dumps(articles_with_resources, indent=2)
-        logger.info(f"Search completed successfully, found {len(results)} results")
-
-        return [types.TextContent(
-            type="text",
-            text=formatted_results
-        )]
-        
+            
     except Exception as e:
-        logger.exception("Error in call_tool")
+        logger.exception(f"Error in call_tool ({name})")
         return [types.TextContent(
             type="text",
-            text=f"Error searching PubMed: {str(e)}",
+            text=f"Error processing request: {str(e)}",
             isError=True
         )]
 
