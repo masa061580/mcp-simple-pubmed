@@ -162,8 +162,18 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[types.TextCont
             articles_with_resources = []
             for article in results:
                 pmid = article["pmid"]
+                # Add original URIs
                 article["abstract_uri"] = f"pubmed://{pmid}/abstract"
                 article["full_text_uri"] = f"pubmed://{pmid}/full_text"
+                
+                # Add DOI URL if DOI exists
+                if "doi" in article:
+                    article["doi_url"] = f"https://doi.org/{article['doi']}"
+                    
+                # Add PubMed URLs
+                article["pubmed_url"] = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+                article["pubmed_fulltext_url"] = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmid}/"
+                
                 articles_with_resources.append(article)
 
             # Format the response
