@@ -3,10 +3,11 @@ Client for retrieving full text content of PubMed articles.
 Separate from main PubMed client to maintain code separation and stability.
 """
 import logging
-import xml.etree.ElementTree as ET
+import time
 import http.client
-from typing import Optional
+from typing import Optional, Tuple
 from Bio import Entrez
+import xml.etree.ElementTree as ET
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -33,42 +34,50 @@ class FullTextClient:
         if api_key:
             Entrez.api_key = api_key
 
-    async def get_pmcid(self, pmid: str) -> Optional[str]:
-        """Get PMC ID for a given PubMed ID if available.
+    async def check_full_text_availability(self, pmid: str) -> Tuple[bool, Optional[str]]:
+        """Check if full text is available in PMC and get PMC ID if it exists.
         
         Args:
             pmid: PubMed ID of the article
             
         Returns:
-            PMC ID if available, None otherwise
+            Tuple of (availability boolean, PMC ID if available)
         """
         try:
-            logger.info(f"Looking up PMC ID for PMID {pmid}")
+            logger.info(f"Checking PMC availability for PMID {pmid}")
             handle = Entrez.elink(dbfrom="pubmed", db="pmc", id=pmid)
+            
             if not handle:
                 logger.info(f"No PMC link found for PMID {pmid}")
-                return None
+                return False, None
                 
             xml_content = handle.read()
             handle.close()
             
             # Parse XML to get PMC ID
             root = ET.fromstring(xml_content)
-            pmc_id_elem = root.find('.//LinkSetDb/Link/Id')
-            if pmc_id_elem is None:
+            linksetdb = root.find(".//LinkSetDb")
+            if linksetdb is None:
                 logger.info(f"No PMC ID found for PMID {pmid}")
-                return None
+                return False, None
                 
-            pmc_id = pmc_id_elem.text
+            id_elem = linksetdb.find(".//Id")
+            if id_elem is None:
+                logger.info(f"No PMC ID element found for PMID {pmid}")
+                return False, None
+                
+            pmc_id = id_elem.text
             logger.info(f"Found PMC ID {pmc_id} for PMID {pmid}")
-            return pmc_id
+            return True, pmc_id
             
         except Exception as e:
-            logger.exception(f"Error getting PMC ID for PMID {pmid}: {str(e)}")
-            return None
+            logger.exception(f"Error checking PMC availability for PMID {pmid}: {str(e)}")
+            return False, None
 
     async def get_full_text(self, pmid: str) -> Optional[str]:
         """Get full text of the article if available through PMC.
+        
+        Handles truncated responses by making additional requests.
         
         Args:
             pmid: PubMed ID of the article
@@ -77,67 +86,47 @@ class FullTextClient:
             Full text content if available, None otherwise
         """
         try:
-            # First get the PMC ID
-            pmc_id = await self.get_pmcid(pmid)
-            if not pmc_id:
-                logger.info(f"No PMC ID available for PMID {pmid}")
+            # First check availability and get PMC ID
+            available, pmc_id = await self.check_full_text_availability(pmid)
+            if not available or pmc_id is None:
+                logger.info(f"Full text not available in PMC for PMID {pmid}")
                 return None
-            
+
             logger.info(f"Fetching full text for PMC ID {pmc_id}")
-            full_text_handle = Entrez.efetch(db="pmc", id=pmc_id, rettype="text")
-            if not full_text_handle:
-                logger.info(f"Could not fetch full text for PMC ID {pmc_id}")
-                return None
-                
-            full_text = full_text_handle.read()
-            full_text_handle.close()
+            content = ""
+            retstart = 0
             
-            if isinstance(full_text, bytes):
-                full_text = full_text.decode('utf-8')
+            while True:
+                full_text_handle = Entrez.efetch(
+                    db="pmc", 
+                    id=pmc_id, 
+                    rettype="xml",
+                    retstart=retstart
+                )
                 
-            return full_text
+                if not full_text_handle:
+                    break
+                    
+                chunk = full_text_handle.read()
+                full_text_handle.close()
+                
+                if isinstance(chunk, bytes):
+                    chunk = chunk.decode('utf-8')
+                
+                content += chunk
+                
+                # Check if there might be more content
+                if "[truncated]" not in chunk and "Result too long" not in chunk:
+                    break
+                    
+                # Increment retstart for next chunk
+                retstart += len(chunk)
+                
+                # Add small delay to respect API rate limits
+                time.sleep(0.5)
+                
+            return content
             
         except Exception as e:
             logger.exception(f"Error getting full text for PMID {pmid}: {str(e)}")
             return None
-
-    async def check_full_text_availability(self, pmid: str) -> dict:
-        """Check if full text is available and get access information.
-        
-        Args:
-            pmid: PubMed ID of the article
-            
-        Returns:
-            Dictionary with availability information:
-            {
-                "has_pmc": boolean,
-                "pmc_id": string or None,
-                "status": "available" | "not_in_pmc" | "error",
-                "message": string
-            }
-        """
-        try:
-            pmc_id = await self.get_pmcid(pmid)
-            if not pmc_id:
-                return {
-                    "has_pmc": False,
-                    "pmc_id": None,
-                    "status": "not_in_pmc",
-                    "message": "Article not available in PubMed Central"
-                }
-                
-            return {
-                "has_pmc": True,
-                "pmc_id": pmc_id,
-                "status": "available",
-                "message": "Full text available in PubMed Central"
-            }
-            
-        except Exception as e:
-            logger.exception(f"Error checking full text availability for PMID {pmid}: {str(e)}")
-            return {
-                "has_pmc": False,
-                "pmc_id": None,
-                "status": "error",
-                "message": f"Error checking availability: {str(e)}"
-            }

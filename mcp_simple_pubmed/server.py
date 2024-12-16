@@ -4,7 +4,7 @@ MCP server implementation for PubMed integration.
 import os
 import json
 import logging
-from typing import Optional, Sequence, Dict, Any
+from typing import Optional, Sequence, Dict, Any, Tuple
 from urllib.parse import urlparse, parse_qs
 
 from mcp.server import Server
@@ -22,8 +22,8 @@ app = Server("pubmed-server")
 # Set up error handler
 app.onerror = lambda error: logger.error(f"Server error: {error}")
 
-def configure_pubmed_client() -> PubMedClient:
-    """Configure PubMed client with environment settings."""
+def configure_clients() -> Tuple[PubMedClient, FullTextClient]:
+    """Configure PubMed and full text clients with environment settings."""
     email = os.environ.get("PUBMED_EMAIL")
     if not email:
         raise ValueError("PUBMED_EMAIL environment variable is required")
@@ -37,7 +37,7 @@ def configure_pubmed_client() -> PubMedClient:
     return pubmed_client, fulltext_client
 
 # Initialize the clients
-pubmed_client, fulltext_client = configure_pubmed_client()
+pubmed_client, fulltext_client = configure_clients()
 
 @app.list_tools()
 async def list_tools() -> list[types.Tool]:
@@ -187,9 +187,9 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[types.TextCont
                 )]
 
             # First check availability
-            availability = await fulltext_client.check_full_text_availability(pmid)
+            available, pmc_id = await fulltext_client.check_full_text_availability(pmid)
             
-            if availability["status"] == "available":
+            if available:
                 full_text = await fulltext_client.get_full_text(pmid)
                 if full_text:
                     logger.info(f"Successfully retrieved full text for PMID {pmid}")
@@ -205,10 +205,11 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[types.TextCont
                         isError=True
                     )]
             else:
-                logger.info(f"Full text not available for PMID {pmid}: {availability['message']}")
+                message = "Article not available in PubMed Central"
+                logger.info(f"Full text not available for PMID {pmid}: {message}")
                 return [types.TextContent(
                     type="text",
-                    text=availability["message"],
+                    text=message,
                     isError=True
                 )]
         
@@ -257,23 +258,25 @@ async def read_resource(uri: str) -> types.ReadResourceResult:
                 )]
             )
         elif resource_type == "full_text":
-            full_text = await pubmed_client.get_full_text(pmid)
-            if full_text:
-                return types.ReadResourceResult(
-                    contents=[types.ResourceContent(
-                        uri=uri,
-                        text=full_text,
-                        mimeType="text/plain"
-                    )]
-                )
-            else:
-                return types.ReadResourceResult(
-                    contents=[types.ResourceContent(
-                        uri=uri,
-                        text="Full text not available",
-                        mimeType="text/plain"
-                    )]
-                )
+            available, pmc_id = await fulltext_client.check_full_text_availability(pmid)
+            if available:
+                full_text = await fulltext_client.get_full_text(pmid)
+                if full_text:
+                    return types.ReadResourceResult(
+                        contents=[types.ResourceContent(
+                            uri=uri,
+                            text=full_text,
+                            mimeType="text/plain"
+                        )]
+                    )
+
+            return types.ReadResourceResult(
+                contents=[types.ResourceContent(
+                    uri=uri,
+                    text="Full text not available in PubMed Central",
+                    mimeType="text/plain"
+                )]
+            )
         else:
             raise ValueError(f"Invalid resource type: {resource_type}")
 
