@@ -2,6 +2,8 @@
 
 An MCP server that provides access to PubMed articles through the Entrez API.
 
+<a href="https://glama.ai/mcp/servers/5wlfb8i6bj"><img width="380" height="200" src="https://glama.ai/mcp/servers/5wlfb8i6bj/badge" alt="mcp-simple-pubmed MCP server" /></a>
+
 ## Features
 
 - Search PubMed database using keywords
