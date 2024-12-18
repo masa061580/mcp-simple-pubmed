@@ -196,32 +196,34 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[types.TextCont
                     isError=True
                 )]
 
-            # First check availability
+            # First check PMC availability
             available, pmc_id = await fulltext_client.check_full_text_availability(pmid)
             
             if available:
                 full_text = await fulltext_client.get_full_text(pmid)
                 if full_text:
-                    logger.info(f"Successfully retrieved full text for PMID {pmid}")
+                    logger.info(f"Successfully retrieved full text from PMC for PMID {pmid}")
                     return [types.TextContent(
                         type="text",
                         text=full_text
                     )]
-                else:
-                    logger.error(f"Failed to retrieve full text for PMID {pmid}")
-                    return [types.TextContent(
-                        type="text",
-                        text="Error retrieving full text even though it was marked as available.",
-                        isError=True
-                    )]
-            else:
-                message = "Article not available in PubMed Central"
-                logger.info(f"Full text not available for PMID {pmid}: {message}")
-                return [types.TextContent(
-                    type="text",
-                    text=message,
-                    isError=True
-                )]
+
+            # Get article details to provide alternative locations
+            article = await pubmed_client.get_article_details(pmid)
+            
+            message = "Full text is not available in PubMed Central.\n\n"
+            message += "The article may be available at these locations:\n"
+            message += f"- PubMed page: https://pubmed.ncbi.nlm.nih.gov/{pmid}/\n"
+            
+            if article and "doi" in article:
+                message += f"- Publisher's site (via DOI): https://doi.org/{article['doi']}\n"
+                
+            logger.info(f"Full text not available in PMC for PMID {pmid}, provided alternative locations")
+            return [types.TextContent(
+                type="text",
+                text=message,
+                isError=True
+            )]
         
         else:
             logger.error(f"Unknown tool: {name}")
