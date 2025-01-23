@@ -13,6 +13,10 @@ from mcp.server.stdio import stdio_server
 from .pubmed_client import PubMedClient
 from .fulltext_client import FullTextClient
 
+import sys
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stdin.reconfigure(encoding='utf-8')
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("pubmed-server")
