@@ -1,4 +1,5 @@
 # MCP Simple PubMed
+[![smithery badge](https://smithery.ai/badge/mcp-simple-pubmed)](https://smithery.ai/server/mcp-simple-pubmed)
 
 An MCP server that provides access to PubMed articles through the Entrez API.
 
@@ -20,6 +21,15 @@ Finally, this tool of course can’t give you access to paywalled/paid papers. Y
 
 ## Installation
 
+### Installing via Smithery
+
+To install Simple PubMed for Claude Desktop automatically via [Smithery](https://smithery.ai/server/mcp-simple-pubmed):
+
+```bash
+npx -y @smithery/cli install mcp-simple-pubmed --client claude
+```
+
+### Manual Installation
 ```bash
 pip install mcp-simple-pubmed
 ```
