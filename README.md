@@ -128,6 +128,7 @@ This development mode installation allows you to use the code with all enhanceme
 > 開発モードでインストールすると、すべての機能強化が含まれたコードを使用でき、さらに変更を加えても再インストールが不要になります。
 
 ### Installing via Smithery | Smitheryを使ったインストール
+> **注意**: SmitheryとPipでインストールされるのは元のバージョンであり、この強化版ではありません。この改良版を使用するには、上記の開発版インストール方法を使用してください。
 
 To install the original version of Simple PubMed for Claude Desktop automatically via [Smithery](https://smithery.ai/server/mcp-simple-pubmed):
 
@@ -142,7 +143,7 @@ pip install mcp-simple-pubmed
 
 **Note**: The Smithery and pip installations will install the original version, not this enhanced fork. Use the development installation method above to use this improved version.
 
-> **注意**: SmitheryとPipでインストールされるのは元のバージョンであり、この強化版ではありません。この改良版を使用するには、上記の開発版インストール方法を使用してください。
+
 
 ## Configuration | 設定
 
