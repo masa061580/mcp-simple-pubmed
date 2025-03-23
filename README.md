@@ -107,18 +107,42 @@ Finally, this tool of course can't give you access to paywalled/paid papers. You
 
 ## Installation | インストール方法
 
+### Development Installation | 開発版インストール
+
+If you want to use this enhanced version with all improvements, follow these steps:
+
+#### Clone the repository | リポジトリのクローン
+```bash
+git clone https://github.com/あなたのユーザー名/mcp-simple-pubmed.git
+cd mcp-simple-pubmed
+```
+
+#### Install in development mode | 開発モードでインストール
+```bash
+pip install biopython mcp
+pip install -e .
+```
+
+This development mode installation allows you to use the code with all enhancements and make further modifications without reinstalling.
+
+> 開発モードでインストールすると、すべての機能強化が含まれたコードを使用でき、さらに変更を加えても再インストールが不要になります。
+
 ### Installing via Smithery | Smitheryを使ったインストール
 
-To install Simple PubMed for Claude Desktop automatically via [Smithery](https://smithery.ai/server/mcp-simple-pubmed):
+To install the original version of Simple PubMed for Claude Desktop automatically via [Smithery](https://smithery.ai/server/mcp-simple-pubmed):
 
 ```bash
 npx -y @smithery/cli install mcp-simple-pubmed --client claude
 ```
 
-### Manual Installation | 手動インストール
+### Manual Installation of Released Version | リリース版の手動インストール
 ```bash
 pip install mcp-simple-pubmed
 ```
+
+**Note**: The Smithery and pip installations will install the original version, not this enhanced fork. Use the development installation method above to use this improved version.
+
+> **注意**: SmitheryとPipでインストールされるのは元のバージョンであり、この強化版ではありません。この改良版を使用するには、上記の開発版インストール方法を使用してください。
 
 ## Configuration | 設定
 
@@ -132,6 +156,53 @@ The standard rate limit is 3 requests / second. No rate limiting was implemented
 ## Usage with Claude Desktop | Claude Desktopでの使用方法
 
 Add to your Claude Desktop configuration (`claude_desktop_config.json`):
+
+### For Development Installation | 開発版インストールの場合
+
+(Mac OS)
+
+```json
+{
+  "mcpServers": {
+    "simple-pubmed": {
+      "command": "python",
+      "args": ["-m", "mcp_simple_pubmed"],
+      "cwd": "/path/to/your/mcp-simple-pubmed",
+      "env": {
+        "PUBMED_EMAIL": "your-email@example.com",
+        "PUBMED_API_KEY": "your-api-key" 
+      }
+    }
+  }
+}
+```
+
+(Windows)
+
+```json
+{
+  "mcpServers": {
+    "simple-pubmed": {
+      "command": "C:\\Users\\YOUR_USERNAME\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+      "args": [
+        "-m",
+        "mcp_simple_pubmed"
+      ],
+      "cwd": "C:\\Path\\To\\Your\\mcp-simple-pubmed",
+      "env": {
+        "PUBMED_EMAIL": "your-email@example.com",
+        "PUBMED_API_KEY": "your-api-key" 
+      }
+    }
+  }
+}
+```
+
+The `cwd` parameter specifies the directory where your cloned repository is located. This ensures Claude Desktop uses your enhanced version of the code.
+
+> `cwd`パラメータはクローンしたリポジトリのパスを指定します。これにより、Claude Desktopが改良版のコードを使用することが保証されます。
+
+### For Package Installation | パッケージインストールの場合
 
 (Mac OS)
 
@@ -151,7 +222,6 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
 ```
 
 (Windows)
-
 
 ```json
 {
@@ -176,6 +246,42 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
 This project is a fork of [andybrandt/mcp-simple-pubmed](https://github.com/andybrandt/mcp-simple-pubmed). We would like to express our gratitude to the original author for creating and sharing this useful tool. The enhancements built upon this solid foundation aim to further improve the functionality while respecting the original design philosophy.
 
 > このプロジェクトは[andybrandt/mcp-simple-pubmed](https://github.com/andybrandt/mcp-simple-pubmed)のフォークです。この有用なツールを作成・共有してくれた元の作者に感謝いたします。この堅固な基盤の上に構築された機能強化は、元のデザイン哲学を尊重しながら、機能をさらに向上させることを目的としています。
+
+## Verification of Improvements | 改良の確認方法
+
+After installation, you can verify the enhanced functionality by using these search and retrieval features:
+
+1. **Date range searching**
+   ```
+   search_pubmed(query="cancer therapy 2022:2024[Date - Publication]", max_results=5)
+   ```
+
+2. **Full text retrieval with text formatting option**
+   ```
+   get_paper_fulltext(pmid="39661433", format_as_text=true)
+   ```
+
+3. **Enhanced metadata search**
+   ```
+   search_pubmed(query="BRCA1[MeSH Terms] AND breast cancer", max_results=3)
+   ```
+
+> インストール後、以下の検索と取得機能を使用して改良された機能を確認できます：
+>
+> 1. **日付範囲検索**
+>    ```
+>    search_pubmed(query="cancer therapy 2022:2024[Date - Publication]", max_results=5)
+>    ```
+>
+> 2. **全文取得とテキスト形式オプション**
+>    ```
+>    get_paper_fulltext(pmid="39661433", format_as_text=true)
+>    ```
+>
+> 3. **強化されたメタデータ検索**
+>    ```
+>    search_pubmed(query="BRCA1[MeSH Terms] AND breast cancer", max_results=3)
+>    ```
 
 ## Last Updated | 最終更新日
 
