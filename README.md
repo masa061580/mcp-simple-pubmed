@@ -115,7 +115,7 @@ If you want to use this enhanced version with all improvements, you can install 
 
 ##### Clone the repository | リポジトリのクローン
 ```bash
-git clone https://github.com/あなたのユーザー名/mcp-simple-pubmed.git
+git clone https://github.com/masa061580/mcp-simple-pubmed.git
 cd mcp-simple-pubmed
 ```
 
@@ -163,12 +163,12 @@ If you don't have Python installed, follow these steps:
 
 ##### Step 1: Download ZIP file | ZIPファイルのダウンロード
 
-1. Go to the GitHub repository page: https://github.com/あなたのユーザー名/mcp-simple-pubmed
+1. Go to the GitHub repository page: https://github.com/masa061580/mcp-simple-pubmed
 2. Click the green "Code" button
 3. Select "Download ZIP" from the dropdown menu
 4. Save the ZIP file to a location you can easily find (e.g., Desktop or Downloads folder)
 
-> 1. GitHubリポジトリページにアクセス：https://github.com/あなたのユーザー名/mcp-simple-pubmed
+> 1. GitHubリポジトリページにアクセス：https://github.com/masa061580/mcp-simple-pubmed
 > 2. 緑色の「Code」ボタンをクリック
 > 3. ドロップダウンメニューから「Download ZIP」を選択
 > 4. ZIPファイルを簡単に見つけられる場所（例：デスクトップやダウンロードフォルダ）に保存
