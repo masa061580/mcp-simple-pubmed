@@ -162,6 +162,14 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[types.TextCont
                 max_results=max_results
             )
             
+            if not results:
+                logger.info(f"No results found for query: {query}")
+                return [types.TextContent(
+                    type="text",
+                    text="No results found matching your query. Please try a different search term or check your syntax.",
+                    isError=False
+                )]
+            
             # Create resource URIs for articles
             articles_with_resources = []
             for article in results:
@@ -176,7 +184,13 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[types.TextCont
                     
                 # Add PubMed URLs
                 article["pubmed_url"] = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
-                article["pubmed_fulltext_url"] = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmid}/"
+                
+                # Add PMC URL if available
+                if "pmc_id" in article:
+                    article["pubmed_fulltext_url"] = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{article['pmc_id']}/"
+                    article["has_full_text"] = True
+                else:
+                    article["has_full_text"] = False
                 
                 articles_with_resources.append(article)
 
@@ -199,19 +213,28 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[types.TextCont
                     text="Missing required argument: pmid",
                     isError=True
                 )]
+                
+            # Optional format parameter
+            format_as_text = arguments.get("format_as_text", True)
+            
+            logger.info(f"Fetching full text for PMID {pmid}, format_as_text={format_as_text}")
 
             # First check PMC availability
             available, pmc_id = await fulltext_client.check_full_text_availability(pmid)
             
-            if available:
-                full_text = await fulltext_client.get_full_text(pmid)
-                if full_text:
-                    logger.info(f"Successfully retrieved full text from PMC for PMID {pmid}")
-                    return [types.TextContent(
-                        type="text",
-                        text=full_text
-                    )]
-
+            if available and pmc_id:
+                try:
+                    full_text = await fulltext_client.get_full_text(pmid, format_as_text=format_as_text)
+                    if full_text:
+                        logger.info(f"Successfully retrieved full text from PMC for PMID {pmid}")
+                        return [types.TextContent(
+                            type="text",
+                            text=full_text
+                        )]
+                except Exception as e:
+                    logger.error(f"Error retrieving full text: {str(e)}")
+                    # Fall through to alternatives
+            
             # Get article details to provide alternative locations
             article = await pubmed_client.get_article_details(pmid)
             
@@ -222,11 +245,31 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> list[types.TextCont
             if article and "doi" in article:
                 message += f"- Publisher's site (via DOI): https://doi.org/{article['doi']}\n"
                 
+            # Add citation information if available
+            if article:
+                if "authors" in article and article["authors"]:
+                    first_author = article["authors"][0]
+                    message += f"\nCitation: {first_author}"
+                    if len(article["authors"]) > 1:
+                        message += " et al."
+                        
+                if "journal" in article and article["journal"]:
+                    message += f", {article['journal']}"
+                    
+                if "publication_date" in article:
+                    pub_date = article["publication_date"]
+                    year = pub_date.get("year", "")
+                    if year:
+                        message += f", {year}"
+                        
+                if "title" in article and article["title"]:
+                    message += f"\nTitle: {article['title']}"
+            
             logger.info(f"Full text not available in PMC for PMID {pmid}, provided alternative locations")
             return [types.TextContent(
                 type="text",
                 text=message,
-                isError=True
+                isError=True  # Mark as error so the client knows the full text wasn't found
             )]
         
         else:

@@ -49,7 +49,7 @@ class PubMedSearch:
             List of article metadata dictionaries
         """
         try:
-            # Replace [Date - Publication] with [PDAT] in query
+            # Replace [Date - Publication] with [PDAT] in query for better compatibility
             if "[Date - Publication]" in query:
                 query = query.replace("[Date - Publication]", "[PDAT]")
                 # Make sure date ranges are properly formatted
@@ -135,14 +135,38 @@ class PubMedSearch:
                         elif id_type == 'pmc':
                             article["pmc_id"] = article_id.text
                             
-                    # Add URLs
-                    article["urls"] = self._generate_urls(pmid, 
-                                                     article.get("doi"), 
-                                                     article.get("pmc_id"))
+                    # Get MeSH terms if available
+                    mesh_terms = []
+                    mesh_headings = article_root.findall('.//MeshHeading')
+                    for mesh in mesh_headings:
+                        descriptor = mesh.find('DescriptorName')
+                        if descriptor is not None and descriptor.text:
+                            mesh_terms.append(descriptor.text)
                     
-                    # Add resource URIs
+                    if mesh_terms:
+                        article["mesh_terms"] = mesh_terms
+                    
+                    # Get keywords if available
+                    keywords = []
+                    keyword_list = article_root.findall('.//Keyword')
+                    for keyword in keyword_list:
+                        if keyword.text:
+                            keywords.append(keyword.text)
+                    
+                    if keywords:
+                        article["keywords"] = keywords
+                            
+                    # Add URLs for human access
+                    article["urls"] = self._generate_urls(pmid, 
+                                                    article.get("doi"), 
+                                                    article.get("pmc_id"))
+                    
+                    # Add resource URIs for MCP
                     article["abstract_uri"] = f"pubmed://{pmid}/abstract"
                     article["full_text_uri"] = f"pubmed://{pmid}/full_text"
+                    
+                    # Check if full text is available
+                    article["has_full_text"] = "pmc_id" in article
                             
                     results.append(article)
                 except Exception as e:
@@ -150,6 +174,10 @@ class PubMedSearch:
                     continue
             
             return results
+
+    except Exception as e:
+        logger.exception(f"Error in search_articles: {str(e)}")
+        return []
 
         except Exception as e:
             logger.exception(f"Error in search_articles: {str(e)}")
