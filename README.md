@@ -115,7 +115,7 @@ If you want to use this enhanced version with all improvements, you can install 
 
 ##### Clone the repository | リポジトリのクローン
 ```bash
-git clone https://github.com/masa061580/mcp-simple-pubmed.git
+git clone https://github.com/あなたのユーザー名/mcp-simple-pubmed.git
 cd mcp-simple-pubmed
 ```
 
@@ -163,12 +163,12 @@ If you don't have Python installed, follow these steps:
 
 ##### Step 1: Download ZIP file | ZIPファイルのダウンロード
 
-1. Go to the GitHub repository page: https://github.com/masa061580/mcp-simple-pubmed
+1. Go to the GitHub repository page: https://github.com/あなたのユーザー名/mcp-simple-pubmed
 2. Click the green "Code" button
 3. Select "Download ZIP" from the dropdown menu
 4. Save the ZIP file to a location you can easily find (e.g., Desktop or Downloads folder)
 
-> 1. GitHubリポジトリページにアクセス：https://github.com/masa061580/mcp-simple-pubmed
+> 1. GitHubリポジトリページにアクセス：https://github.com/あなたのユーザー名/mcp-simple-pubmed
 > 2. 緑色の「Code」ボタンをクリック
 > 3. ドロップダウンメニューから「Download ZIP」を選択
 > 4. ZIPファイルを簡単に見つけられる場所（例：デスクトップやダウンロードフォルダ）に保存
@@ -241,7 +241,7 @@ If you don't have Python installed, follow these steps:
 >    
 >    例（Mac/Linux）：
 >    ```bash
->    cd /Users/YourUsername/Downloads/mcp-simple-pubmed
+>    cd /Users/YourUsername/Downloads\mcp-simple-pubmed
 >    ```
 >
 > 2. 開発モードでパッケージをインストール：
@@ -282,11 +282,27 @@ The standard rate limit is 3 requests / second. No rate limiting was implemented
 
 ## Usage with Claude Desktop | Claude Desktopでの使用方法
 
-Add to your Claude Desktop configuration (`claude_desktop_config.json`):
+### Step 1: Locate the Claude Desktop configuration file | Claude Desktopの設定ファイルを見つける
 
-### For Development Installation | 開発版インストールの場合
+Find and open the `claude_desktop_config.json` file:
 
-(Mac OS)
+- **Windows**: Usually located at `C:\Users\YOUR_USERNAME\AppData\Roaming\Claude Desktop\claude_desktop_config.json`
+- **Mac**: Usually located at `/Users/YOUR_USERNAME/Library/Application Support/Claude Desktop/claude_desktop_config.json`
+
+You can open this file with any text editor like Notepad (Windows) or TextEdit (Mac).
+
+> `claude_desktop_config.json`ファイルを見つけて開きます：
+>
+> - **Windows**: 通常は `C:\Users\YOUR_USERNAME\AppData\Roaming\Claude Desktop\claude_desktop_config.json` にあります
+> - **Mac**: 通常は `/Users/YOUR_USERNAME/Library/Application Support/Claude Desktop/claude_desktop_config.json` にあります
+>
+> このファイルはメモ帳（Windows）やTextEdit（Mac）などのテキストエディタで開くことができます。
+
+### Step 2: Add or modify the configuration | 設定を追加または変更する
+
+**For Mac OS**
+
+Copy and paste this configuration, making sure to replace `/path/to/your/mcp-simple-pubmed` with the actual path where you extracted or cloned the repository:
 
 ```json
 {
@@ -304,7 +320,9 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
 }
 ```
 
-(Windows)
+**For Windows**
+
+Copy and paste this configuration, making sure to replace `C:\Path\To\Your\mcp-simple-pubmed` with the actual path where you extracted or cloned the repository. Remember to use double backslashes (`\\`) in the paths:
 
 ```json
 {
@@ -325,48 +343,29 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
 }
 ```
 
-The `cwd` parameter specifies the directory where your cloned repository is located. This ensures Claude Desktop uses your enhanced version of the code.
+**Important Notes:**
 
-> `cwd`パラメータはクローンしたリポジトリのパスを指定します。これにより、Claude Desktopが改良版のコードを使用することが保証されます。
+- Replace `your-email@example.com` with your actual email address (required by NCBI)
+- If you have an NCBI API key, replace `your-api-key`; otherwise, you can remove this line
+- The `cwd` parameter specifies the directory where your repository is located
+- For Windows, you may need to adjust the Python path if your installation is different
 
-### For Package Installation | パッケージインストールの場合
+> **重要なポイント：**
+>
+> - `your-email@example.com` を実際のメールアドレスに置き換えます（NCBIに必要）
+> - NCBI APIキーをお持ちの場合は、`your-api-key`を置き換えます。お持ちでない場合はこの行を削除できます
+> - `cwd`パラメータは、リポジトリが配置されているディレクトリを指定します
+> - Windowsの場合、Pythonのインストール場所が異なる場合はパスを調整する必要があります
 
-(Mac OS)
+### Step 3: Save the configuration and restart Claude Desktop | 設定を保存しClaude Desktopを再起動する
 
-```json
-{
-  "mcpServers": {
-    "simple-pubmed": {
-      "command": "python",
-      "args": ["-m", "mcp_simple_pubmed"],
-      "env": {
-        "PUBMED_EMAIL": "your-email@example.com",
-        "PUBMED_API_KEY": "your-api-key" 
-      }
-    }
-  }
-}
-```
+1. Save the configuration file
+2. Close Claude Desktop if it's running
+3. Restart Claude Desktop
 
-(Windows)
-
-```json
-{
-  "mcpServers": {
-    "simple-pubmed": {
-      "command": "C:\\Users\\YOUR_USERNAME\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
-      "args": [
-        "-m",
-        "mcp_simple_pubmed"
-      ],
-      "env": {
-        "PUBMED_EMAIL": "your-email@example.com",
-        "PUBMED_API_KEY": "your-api-key" 
-      }
-    }
-  }
-}
-```
+> 1. 設定ファイルを保存します
+> 2. Claude Desktopが実行中の場合は閉じます
+> 3. Claude Desktopを再起動します
 
 ## Acknowledgements | 謝辞
 
