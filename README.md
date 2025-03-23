@@ -109,19 +109,145 @@ Finally, this tool of course can't give you access to paywalled/paid papers. You
 
 ### Development Installation | 開発版インストール
 
-If you want to use this enhanced version with all improvements, follow these steps:
+If you want to use this enhanced version with all improvements, you can install it using either method below.
 
-#### Clone the repository | リポジトリのクローン
+#### For Git Users | Gitユーザー向け
+
+##### Clone the repository | リポジトリのクローン
 ```bash
 git clone https://github.com/あなたのユーザー名/mcp-simple-pubmed.git
 cd mcp-simple-pubmed
 ```
 
-#### Install in development mode | 開発モードでインストール
+##### Install in development mode | 開発モードでインストール
 ```bash
 pip install biopython mcp
 pip install -e .
 ```
+
+#### For Beginners (No Git Required) | 初心者向け（Git不要）
+
+こちらの方法は、Gitを使用せずにインストールする方法です。
+
+This method allows you to install without using Git.
+
+##### Step 0: Install Python (if not already installed) | Pythonのインストール（まだない場合）
+
+If you don't have Python installed, follow these steps:
+
+1. Download Python from the official website: https://www.python.org/downloads/
+   - Click on "Download Python 3.x.x" (the latest version)
+
+2. Run the installer:
+   - **Important**: Check the box that says "Add Python to PATH" during installation
+   - Click "Install Now"
+
+3. Verify installation:
+   - Open Command Prompt (Windows) or Terminal (Mac/Linux)
+   - Type `python --version` and press Enter
+   - You should see something like `Python 3.x.x`
+
+> Pythonがまだインストールされていない場合は、以下の手順に従ってください：
+>
+> 1. Pythonを公式サイトからダウンロード：https://www.python.org/downloads/
+>    - 「Download Python 3.x.x」（最新バージョン）をクリック
+>
+> 2. インストーラーを実行：
+>    - **重要**: インストール中に「Add Python to PATH」のボックスにチェックを入れる
+>    - 「Install Now」をクリック
+>
+> 3. インストールの確認：
+>    - コマンドプロンプト（Windows）またはターミナル（Mac/Linux）を開く
+>    - `python --version`と入力してEnterを押す
+>    - `Python 3.x.x`のように表示されれば成功です
+
+##### Step 1: Download ZIP file | ZIPファイルのダウンロード
+
+1. Go to the GitHub repository page: https://github.com/あなたのユーザー名/mcp-simple-pubmed
+2. Click the green "Code" button
+3. Select "Download ZIP" from the dropdown menu
+4. Save the ZIP file to a location you can easily find (e.g., Desktop or Downloads folder)
+
+> 1. GitHubリポジトリページにアクセス：https://github.com/あなたのユーザー名/mcp-simple-pubmed
+> 2. 緑色の「Code」ボタンをクリック
+> 3. ドロップダウンメニューから「Download ZIP」を選択
+> 4. ZIPファイルを簡単に見つけられる場所（例：デスクトップやダウンロードフォルダ）に保存
+
+##### Step 2: Extract the ZIP file | ZIPファイルの解凍
+
+1. Right-click on the downloaded ZIP file
+2. Select "Extract All..." (Windows) or use your preferred extraction tool
+3. Choose a destination folder (Remember this location!)
+4. Click "Extract"
+
+> 1. ダウンロードしたZIPファイルを右クリック
+> 2. 「すべて展開...」（Windows）を選択、または好みの解凍ツールを使用
+> 3. 解凍先フォルダを選択（この場所を覚えておいてください！）
+> 4. 「展開」をクリック
+
+##### Step 3: Install required packages | 必要なパッケージのインストール
+
+1. Open Command Prompt (Windows) or Terminal (Mac/Linux)
+   - Windows: Press `Windows key + R`, type `cmd` and press Enter
+   - Mac: Open Finder > Applications > Utilities > Terminal
+
+2. Install the required packages:
+   ```bash
+   pip install biopython mcp
+   ```
+
+> 1. コマンドプロンプト（Windows）またはターミナル（Mac/Linux）を開く
+>    - Windows: `Windowsキー + R`を押し、`cmd`と入力してEnterを押す
+>    - Mac: Finder > アプリケーション > ユーティリティ > ターミナルを開く
+>
+> 2. 必要なパッケージをインストール：
+>    ```bash
+>    pip install biopython mcp
+>    ```
+
+##### Step 4: Install the package in development mode | 開発モードでパッケージをインストール
+
+1. In Command Prompt/Terminal, navigate to the extracted folder:
+   ```bash
+   cd path\to\extracted\mcp-simple-pubmed
+   ```
+   Replace `path\to\extracted\mcp-simple-pubmed` with the actual path where you extracted the ZIP file.
+   
+   Example (Windows):
+   ```bash
+   cd C:\Users\YourUsername\Downloads\mcp-simple-pubmed
+   ```
+   
+   Example (Mac/Linux):
+   ```bash
+   cd /Users/YourUsername/Downloads/mcp-simple-pubmed
+   ```
+
+2. Install the package in development mode:
+   ```bash
+   pip install -e .
+   ```
+
+> 1. コマンドプロンプト/ターミナルで、解凍したフォルダに移動します：
+>    ```bash
+>    cd 解凍先パス\mcp-simple-pubmed
+>    ```
+>    `解凍先パス\mcp-simple-pubmed`を実際にZIPファイルを解凍した場所のパスに置き換えてください。
+>    
+>    例（Windows）：
+>    ```bash
+>    cd C:\Users\YourUsername\Downloads\mcp-simple-pubmed
+>    ```
+>    
+>    例（Mac/Linux）：
+>    ```bash
+>    cd /Users/YourUsername/Downloads/mcp-simple-pubmed
+>    ```
+>
+> 2. 開発モードでパッケージをインストール：
+>    ```bash
+>    pip install -e .
+>    ```
 
 This development mode installation allows you to use the code with all enhancements and make further modifications without reinstalling.
 
