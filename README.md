@@ -209,18 +209,18 @@ If you don't have Python installed, follow these steps:
 
 1. In Command Prompt/Terminal, navigate to the extracted folder:
    ```bash
-   cd path\to\extracted\mcp-simple-pubmed
+   cd path\to\extracted\mcp-simple-pubmed-master\mcp-simple-pubmed-master
    ```
    Replace `path\to\extracted\mcp-simple-pubmed` with the actual path where you extracted the ZIP file.
    
    Example (Windows):
    ```bash
-   cd C:\Users\YourUsername\Downloads\mcp-simple-pubmed
+   cd C:\Users\YourUsername\Downloads\mcp-simple-pubmed-master\mcp-simple-pubmed-master
    ```
    
    Example (Mac/Linux):
    ```bash
-   cd /Users/YourUsername/Downloads/mcp-simple-pubmed
+   cd /Users/YourUsername/Downloads/mcp-simple-pubmed-master/mcp-simple-pubmed-master
    ```
 
 2. Install the package in development mode:
@@ -236,12 +236,12 @@ If you don't have Python installed, follow these steps:
 >    
 >    例（Windows）：
 >    ```bash
->    cd C:\Users\YourUsername\Downloads\mcp-simple-pubmed
+>    cd C:\Users\YourUsername\Downloads\mcp-simple-pubmed-master\mcp-simple-pubmed-master
 >    ```
 >    
 >    例（Mac/Linux）：
 >    ```bash
->    cd /Users/YourUsername/Downloads\mcp-simple-pubmed
+>    cd /Users/YourUsername/Downloads/mcp-simple-pubmed-master/mcp-simple-pubmed-master
 >    ```
 >
 > 2. 開発モードでパッケージをインストール：
